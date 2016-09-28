@@ -56,11 +56,12 @@ def parse_date(date):
 
 
 class RowParser(csvfeed.RowParser):
-    def __init__(self, dailyBarTime, frequency, timezone=None, sanitize=False):
+    def __init__(self, dailyBarTime, frequency, timezone=None, sanitize=False, rowFilter=None):
         self.__dailyBarTime = dailyBarTime
         self.__frequency = frequency
         self.__timezone = timezone
         self.__sanitize = sanitize
+        self.__rowFilter = rowFilter
 
     def __parseDate(self, dateString):
         ret = parse_date(dateString)
@@ -80,6 +81,9 @@ class RowParser(csvfeed.RowParser):
         return ","
 
     def parseBar(self, csvRowDict):
+        if(self.__rowFilter!=None and self.__rowFilter(csvRowDict)):
+            return None
+            
         dateTime = self.__parseDate(csvRowDict["Date"])
         close = float(csvRowDict["Close"])
         open_ = float(csvRowDict["Open"])
@@ -129,7 +133,7 @@ class Feed(csvfeed.BarFeed):
     def barsHaveAdjClose(self):
         return False
 
-    def addBarsFromCSV(self, instrument, path, timezone=None):
+    def addBarsFromCSV(self, instrument, path, timezone=None, rowFilter=None):
         """Loads bars for a given instrument from a CSV formatted file.
         The instrument gets registered in the bar feed.
 
@@ -139,10 +143,12 @@ class Feed(csvfeed.BarFeed):
         :type path: string.
         :param timezone: The timezone to use to localize bars. Check :mod:`pyalgotrade.marketsession`.
         :type timezone: A pytz timezone.
+        :param rowFilter: A function to filter rows from the feed
+        :type: a function
         """
 
         if timezone is None:
             timezone = self.__timezone
 
-        rowParser = RowParser(self.getDailyBarTime(), self.getFrequency(), timezone, self.__sanitizeBars)
+        rowParser = RowParser(self.getDailyBarTime(), self.getFrequency(), timezone, self.__sanitizeBars, rowFilter)
         super(Feed, self).addBarsFromCSV(instrument, path, rowParser)

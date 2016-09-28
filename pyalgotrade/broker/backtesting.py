@@ -241,6 +241,17 @@ class Broker(broker.Broker):
     def setCash(self, cash):
         self.__cash = cash
 
+    def getTotalCash(self, includeShares=True):
+        total = self.__cash
+
+        if includeShares:
+            bars = self.__barFeed.getCurrentBars()
+            for instrument, shares in self.__shares.iteritems():
+                instrumentPrice = self._getBar(bars, instrument).getClose(self.getUseAdjustedValues())
+                total += instrumentPrice * shares
+
+        return total
+
     def getCommission(self):
         """Returns the strategy used to calculate order commissions.
 
@@ -440,6 +451,7 @@ class Broker(broker.Broker):
                 assert(order not in self.__activeOrders)
 
     def onBars(self, dateTime, bars):
+
         # Let the fill strategy know that new bars are being processed.
         self.__fillStrategy.onBars(self, bars)
 
@@ -483,13 +495,13 @@ class Broker(broker.Broker):
         return MarketOrder(action, instrument, quantity, onClose, self.getInstrumentTraits(instrument))
 
     def createLimitOrder(self, action, instrument, limitPrice, quantity):
-        return LimitOrder(action, instrument, limitPrice, quantity, self.getInstrumentTraits(instrument))
+        raise NotImplementedError()
 
     def createStopOrder(self, action, instrument, stopPrice, quantity):
         return StopOrder(action, instrument, stopPrice, quantity, self.getInstrumentTraits(instrument))
 
     def createStopLimitOrder(self, action, instrument, stopPrice, limitPrice, quantity):
-        return StopLimitOrder(action, instrument, stopPrice, limitPrice, quantity, self.getInstrumentTraits(instrument))
+        raise NotImplementedError()
 
     def cancelOrder(self, order):
         activeOrder = self.__activeOrders.get(order.getId())
