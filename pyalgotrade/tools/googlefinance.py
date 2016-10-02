@@ -60,7 +60,7 @@ def download_daily_bars(instrument, year, csvFile):
     f.close()
 
 
-def build_feed(instruments, fromYear, toYear, storage, frequency=bar.Frequency.DAY, timezone=None, skipErrors=False):
+def build_feed(instruments, fromYear, toYear, storage, frequency=bar.Frequency.DAY, timezone=None, skipErrors=False, rowFilter=None):
     """Build and load a :class:`pyalgotrade.barfeed.googlefeed.Feed` using CSV files downloaded from Google Finance.
     CSV files are downloaded if they haven't been downloaded before.
 
@@ -108,5 +108,5 @@ def build_feed(instruments, fromYear, toYear, storage, frequency=bar.Frequency.D
                         continue
                     else:
                         raise e
-            ret.addBarsFromCSV(instrument, fileName)
+            ret.addBarsFromCSV(instrument, fileName, rowFilter=rowFilter)
     return ret
