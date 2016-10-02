@@ -133,14 +133,14 @@ class BasicBar(Bar):
     def __init__(self, dateTime, open_, high, low, close, volume, adjClose, frequency, extra={}):
         if high < low:
             raise Exception("high < low on %s" % (dateTime))
-        elif high < open_:
-            raise Exception("high < open on %s" % (dateTime))
-        elif high < close:
-            raise Exception("high < close on %s" % (dateTime))
-        elif low > open_:
-            raise Exception("low > open on %s" % (dateTime))
-        elif low > close:
-            raise Exception("low > close on %s" % (dateTime))
+        # elif high < open_:
+        #     raise Exception("high < open on %s" % (dateTime)) #do nothing .... this hapens sometimes in Bovespa. Ex: PETR3 at 2010-08-24
+        #elif high < close:
+            # raise Exception("high < close on %s" % (dateTime)) #do nothing .... this hapens sometimes in Bovespa. Ex: MRVE3 at 2015-08-24
+        # elif low > open_:
+        #     raise Exception("low > open on %s" % (dateTime))  #do nothing .... this hapens sometimes in Bovespa. Ex: MRFG3 at 2009-09-24
+        # elif low > close:
+        #     raise Exception("low > close on %s" % (dateTime)) #do nothing .... this hapens sometimes in Bovespa. Ex: PETR3 at 2011-05-05
 
         self.__dateTime = dateTime
         self.__open = open_

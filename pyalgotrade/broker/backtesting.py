@@ -451,7 +451,6 @@ class Broker(broker.Broker):
                 assert(order not in self.__activeOrders)
 
     def onBars(self, dateTime, bars):
-
         # Let the fill strategy know that new bars are being processed.
         self.__fillStrategy.onBars(self, bars)
 
