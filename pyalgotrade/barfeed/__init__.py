@@ -111,6 +111,11 @@ class BaseBarFeed(feed.BaseFeed):
                 self.__lastBars[instrument] = bars[instrument]
         return (dateTime, bars)
 
+    def getCurrentValues(self, bars=None):
+        bars = self.getCurrentBars()
+        dateTime = bars.getDateTime()
+        return (dateTime, bars)
+
     def getFrequency(self):
         return self.__frequency
 

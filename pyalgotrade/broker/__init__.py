@@ -22,6 +22,7 @@ import abc
 
 from pyalgotrade import observer
 from pyalgotrade import dispatchprio
+from pyalgotrade import logger
 
 
 # This class is used to prevent bugs like the one triggered in testcases.bitstamp_test:TestCase.testRoundingBug.
@@ -650,3 +651,240 @@ class Broker(observer.Subject):
         :type order: :class:`Order`.
         """
         raise NotImplementedError()
+
+
+class BaseBrokerImpl(Broker):
+
+    LOGGER_NAME = "broker.BaseBrokerImpl"
+
+    def __init__(self, cash, barFeed):
+        super(BaseBrokerImpl, self).__init__()
+
+        assert (cash >= 0)
+        self.__cash = cash
+
+        self._shares = {}
+        self._activeOrders = {}
+        self._allowNegativeCash = False
+        self._nextOrderId = 1
+        self._barFeed = barFeed
+        self.__useAdjustedValues = False
+
+        self.__logger = logger.getLogger(BaseBrokerImpl.LOGGER_NAME)
+
+    def _getNextOrderId(self):
+        ret = self._nextOrderId
+        self._nextOrderId += 1
+        return ret
+
+    def _getBar(self, bars, instrument):
+        ret = bars.getBar(instrument)
+        if ret is None:
+            ret = self._barFeed.getLastBar(instrument)
+        return ret
+
+    def _registerOrder(self, order):
+        assert (order.getId() not in self._activeOrders)
+        assert (order.getId() is not None)
+        self._activeOrders[order.getId()] = order
+
+    def _unregisterOrder(self, order):
+        assert (order.getId() in self._activeOrders)
+        assert (order.getId() is not None)
+        del self._activeOrders[order.getId()]
+
+    def getCurrentDateTime(self):
+        return self._barFeed.getCurrentDateTime()
+
+    def getInstrumentTraits(self, instrument):
+        return IntegerTraits()
+
+    def getCurrentBarForInstrument(self, instrument):
+        bars = self.getFeed().getCurrentBars()
+        return bars.getBar(instrument)
+
+    def getLogger(self):
+        return self.__logger
+
+    def setLogger(self, logger):
+        self.__logger = logger
+
+    def getFeed(self):
+        return self._barFeed
+
+    def setAllowNegativeCash(self, allowNegativeCash):
+        self._allowNegativeCash = allowNegativeCash
+
+    def calculateCostSharesDeltaAndResultingCash(self, order, price, quantity, commission):
+        commission = 10
+        if order.isBuy():
+            cost = price * quantity * -1
+            assert (cost < 0)
+            sharesDelta = quantity
+        elif order.isSell():
+            cost = price * quantity
+            assert (cost > 0)
+            sharesDelta = quantity * -1
+        else:  # Unknown action
+            assert (False)
+        cost -= commission
+        resultingCash = self.getCash() + cost
+
+        return cost, sharesDelta, resultingCash
+
+    def getCash(self, includeShort=True):
+        ret = self.__cash
+        if not includeShort and self._barFeed.getCurrentBars() is not None:
+            bars = self._barFeed.getCurrentBars()
+            for instrument, shares in self._shares.iteritems():
+                if shares < 0:
+                    instrumentPrice = self._getBar(bars, instrument).getClose(self.getUseAdjustedValues())
+                    ret += instrumentPrice * shares
+        return ret
+
+    def setCash(self, cash):
+        self.__cash = cash
+
+    def getAvailableCash(self):
+        return self.__cash
+
+    def getActiveOrders(self, instrument=None):
+        if instrument is None:
+            ret = self._activeOrders.values()
+        else:
+            ret = [order for order in self._activeOrders.values() if order.getInstrument() == instrument]
+        return ret
+
+    def getAllActiveOrders(self):
+        return self._activeOrders
+
+    def getShares(self, instrument):
+        return self._shares.get(instrument, 0)
+
+    def getAllShares(self):
+        return self._shares
+
+    def getPositions(self):
+        return self._shares
+
+    def getActiveInstruments(self):
+        return [instrument for instrument, shares in self._shares.iteritems() if shares != 0]
+
+    def __getEquityWithBars(self, bars):
+        ret = self.getCash()
+        if bars is not None:
+            for instrument, shares in self._shares.iteritems():
+                instrumentPrice = self._getBar(bars, instrument).getClose(self.getUseAdjustedValues())
+                ret += instrumentPrice * shares
+        return ret
+
+    def getUseAdjustedValues(self):
+        return self.__useAdjustedValues
+
+    def setUseAdjustedValues(self, useAdjusted):
+        # Deprecated since v0.15
+        if not self._barFeed.barsHaveAdjClose():
+            raise Exception("The barfeed doesn't support adjusted close values")
+        self.__useAdjustedValues = useAdjusted
+
+    def getEquity(self):
+        """Returns the portfolio value (cash + shares)."""
+        return self.__getEquityWithBars(self._barFeed.getCurrentBars())
+
+    def handleOrderExecution(self, order, dateTime, price, quantity, commission, resultingCash, sharesDelta):
+        # Update the order before updating internal state since addExecutionInfo may raise.
+        # addExecutionInfo should switch the order state.
+        orderExecutionInfo = OrderExecutionInfo(price, quantity, commission, dateTime)
+        order.addExecutionInfo(orderExecutionInfo)
+
+        # Commit the order execution.
+        self.__cash = resultingCash
+        updatedShares = order.getInstrumentTraits().roundQuantity(
+            self.getShares(order.getInstrument()) + sharesDelta
+        )
+        if updatedShares == 0:
+            del self._shares[order.getInstrument()]
+        else:
+            self._shares[order.getInstrument()] = updatedShares
+
+        # Notify the order update
+        if order.isFilled():
+            self._unregisterOrder(order)
+            self.notifyOrderEvent(OrderEvent(order, OrderEvent.Type.FILLED, orderExecutionInfo))
+        elif order.isPartiallyFilled():
+            self.notifyOrderEvent(
+                OrderEvent(order, OrderEvent.Type.PARTIALLY_FILLED, orderExecutionInfo)
+            )
+        else:
+            assert (False)
+
+    def submitOrder(self, order):
+        if order.isInitial():
+            order.setSubmitted(self._getNextOrderId(), self.getCurrentDateTime())
+            self._registerOrder(order)
+            # Switch from INITIAL -> SUBMITTED
+            order.switchState(Order.State.SUBMITTED)
+            self.notifyOrderEvent(OrderEvent(order, OrderEvent.Type.SUBMITTED, None))
+        else:
+            raise Exception("The order was already processed")
+
+    def acceptOrder(self, datetime, order):
+        if order.isSubmitted():
+            order.setAcceptedDateTime(datetime)
+            order.switchState(Order.State.ACCEPTED)
+            self.notifyOrderEvent(OrderEvent(order, OrderEvent.Type.ACCEPTED, None))
+
+    def cancelOrder(self, order):
+        activeOrder = self._activeOrders.get(order.getId())
+        if activeOrder is None:
+            raise Exception("The order is not active anymore")
+        if activeOrder.isFilled():
+            raise Exception("Can't cancel order that has already been filled")
+
+        self._unregisterOrder(activeOrder)
+        activeOrder.switchState(Order.State.CANCELED)
+        self.notifyOrderEvent(
+            OrderEvent(activeOrder, OrderEvent.Type.CANCELED, "User requested cancellation")
+        )
+
+    def isOrderExpired(self, order, bar_):
+        return not order.getGoodTillCanceled() and bar_.getDateTime().date() > order.getAcceptedDateTime().date()
+
+    def expireOrder(self, order):
+        self._unregisterOrder(order)
+        order.switchState(Order.State.CANCELED)
+        self.notifyOrderEvent(OrderEvent(order, OrderEvent.Type.CANCELED, "Expired"))
+
+    def createMarketOrder(self, action, instrument, quantity, onClose=False):
+        raise NotImplementedError()
+
+    def createStopOrder(self, action, instrument, stopPrice, quantity):
+        raise NotImplementedError()
+
+    def createLimitOrder(self, action, instrument, limitPrice, quantity):
+        raise NotImplementedError()
+
+    def createStopLimitOrder(self, action, instrument, stopPrice, limitPrice, quantity):
+        raise NotImplementedError()
+
+    def start(self):
+        super(BaseBrokerImpl, self).start()
+
+    def stop(self):
+        pass
+
+    def join(self):
+        pass
+
+    def eof(self):
+        # If there are no more events in the barfeed, then there is nothing left for us to do since all processing took
+        # place while processing barfeed events.
+        return self._barFeed.eof()
+
+    def dispatch(self):
+        # All events were already emitted while handling barfeed events.
+        pass
+
+    def peekDateTime(self):
+        return None
+
