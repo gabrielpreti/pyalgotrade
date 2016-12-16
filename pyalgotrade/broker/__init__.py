@@ -792,6 +792,8 @@ class BaseBrokerImpl(Broker):
         return self.__getEquityWithBars(self._barFeed.getCurrentBars())
 
     def handleOrderExecution(self, order, dateTime, price, quantity, commission, resultingCash, sharesDelta):
+        self.getLogger().info("instrument=%s date=%s action=%s shares=%s price=%s commission=%s resultingCash=%s" % (order.getInstrument(), dateTime, order.getAction(), quantity, price, commission, resultingCash))
+
         # Update the order before updating internal state since addExecutionInfo may raise.
         # addExecutionInfo should switch the order state.
         orderExecutionInfo = OrderExecutionInfo(price, quantity, commission, dateTime)
