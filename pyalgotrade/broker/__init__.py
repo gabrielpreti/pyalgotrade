@@ -97,6 +97,15 @@ class Order(object):
         SELL = 3
         SELL_SHORT = 4
 
+        @classmethod
+        def fromInteger(cls, val):
+            return {
+                1: cls.BUY,
+                2: cls.BUY_TO_COVER,
+                3: cls.SELL,
+                4: cls.SELL_SHORT
+            }[val]
+
     class State(object):
         INITIAL = 1  # Initial state.
         SUBMITTED = 2  # Order has been submitted.
@@ -122,12 +131,33 @@ class Order(object):
             else:
                 raise Exception("Invalid state")
 
+        @classmethod
+        def fromInteger(cls, val):
+            return {
+                1: cls.INITIAL,
+                2: cls.SUBMITTED,
+                3: cls.ACCEPTED,
+                4: cls.CANCELED,
+                5: cls.PARTIALLY_FILLED,
+                6: cls.FILLED
+            }[val]
+
     class Type(object):
         MARKET = 1
         LIMIT = 2
         STOP = 3
         STOP_LIMIT = 4
         NEXT_CUSTOM_TYPE = 1000
+
+        @classmethod
+        def fromInteger(cls, val):
+            return {
+                1: cls.MARKET,
+                2: cls.LIMIT,
+                3: cls.STOP,
+                4: cls.STOP_LIMIT,
+                5: cls.NEXT_CUSTOM_TYPE
+            }[val]
 
     # Valid state transitions.
     VALID_TRANSITIONS = {
@@ -136,6 +166,8 @@ class Order(object):
         State.ACCEPTED: [State.PARTIALLY_FILLED, State.FILLED, State.CANCELED],
         State.PARTIALLY_FILLED: [State.PARTIALLY_FILLED, State.FILLED, State.CANCELED],
     }
+
+
 
     def __init__(self, type_, action, instrument, quantity, instrumentTraits):
         if quantity is not None and quantity <= 0:
@@ -267,6 +299,9 @@ class Order(object):
         """Returns the number of shares that have been executed."""
         return self.__filled
 
+    def setFilled(self, fill):
+        self.__filled = fill
+
     def getRemaining(self):
         """Returns the number of shares still outstanding."""
         return self.__instrumentTraits.roundQuantity(self.__quantity - self.__filled)
@@ -275,8 +310,14 @@ class Order(object):
         """Returns the average price of the shares that have been executed, or None if nothing has been filled."""
         return self.__avgFillPrice
 
+    def setAvgFillPrice(self, price):
+        self.__avgFillPrice = price
+
     def getCommissions(self):
         return self.__commissions
+
+    def setCommissions(self, comm):
+        self.__commissions = comm
 
     def getGoodTillCanceled(self):
         """Returns True if the order is good till canceled."""
@@ -292,8 +333,6 @@ class Order(object):
 
         .. note:: This can't be changed once the order is submitted.
         """
-        if self.__state != Order.State.INITIAL:
-            raise Exception("The order has already been submitted")
         self.__goodTillCanceled = goodTillCanceled
 
     def getAllOrNone(self):
@@ -308,8 +347,6 @@ class Order(object):
 
         .. note:: This can't be changed once the order is submitted.
         """
-        if self.__state != Order.State.INITIAL:
-            raise Exception("The order has already been submitted")
         self.__allOrNone = allOrNone
 
     def addExecutionInfo(self, orderExecutionInfo):
