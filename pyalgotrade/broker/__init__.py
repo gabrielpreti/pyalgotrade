@@ -106,6 +106,19 @@ class Order(object):
                 4: cls.SELL_SHORT
             }[val]
 
+        @classmethod
+        def toString(cls, action):
+            if action == cls.BUY:
+                return "BUY"
+            elif action == cls.BUY_TO_COVER:
+                return 'BUY TO COVER'
+            elif action == cls.SELL:
+                return "SELL"
+            elif action == cls.SELL_SHORT:
+                return "SELL SHORT"
+            else:
+                raise "Invalid Action"
+
     class State(object):
         INITIAL = 1  # Initial state.
         SUBMITTED = 2  # Order has been submitted.

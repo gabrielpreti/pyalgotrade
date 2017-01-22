@@ -37,12 +37,14 @@ class Database(dbfeed.Database):
     def __init__(self, dbFilePath):
         self.__instrumentIds = {}
 
-        # If the file doesn't exist, we'll create it and initialize it.
-        initialize = False
-        if not os.path.exists(dbFilePath):
-            initialize = True
         self.__connection = sqlite3.connect(dbFilePath)
         self.__connection.isolation_level = None  # To do auto-commit
+
+        # If the file doesn't exist, we'll create it and initialize it.
+        initialize = False
+        if not os.path.exists(dbFilePath) or not self.schemaExists():
+            initialize = True
+
         if initialize:
             self.createSchema()
 
@@ -73,6 +75,23 @@ class Database(dbfeed.Database):
         # Cache the id.
         self.__instrumentIds[instrument] = ret
         return ret
+
+    def schemaExists(self):
+        sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+
+        cursor = self.__connection.cursor()
+        cursor.execute(sql, ['bar'])
+        if cursor.fetchone() is None:
+            cursor.close()
+            return False
+
+        cursor.execute(sql, ['instrument'])
+        if cursor.fetchone() is None:
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
 
     def createSchema(self):
         self.__connection.execute(
@@ -133,6 +152,14 @@ class Database(dbfeed.Database):
             ret.append(bar.BasicBar(dateTime, row[1], row[2], row[3], row[4], row[5], row[6], row[7]))
         cursor.close()
         return ret
+
+    def getLastBarTimestamp(self):
+        sql = "select max(timestamp) from bar"
+        cursor = self.__connection.cursor()
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        cursor.close()
+        return dt.timestamp_to_datetime(ret[0])
 
     def disconnect(self):
         self.__connection.close()
