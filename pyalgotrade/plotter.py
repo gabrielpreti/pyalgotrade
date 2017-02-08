@@ -55,7 +55,7 @@ def _filter_datetimes(dateTimes, fromDate=None, toDate=None):
 
 def _post_plot_fun(subPlot, mplSubplot):
     # Legend
-    mplSubplot.legend(subPlot.getAllSeries().keys(), shadow=True, loc="best")
+    mplSubplot.legend(subPlot.getAllSeries().keys(), shadow=True, loc="best", fontsize = 'xx-small')
     # Don't scale the Y axis
     mplSubplot.yaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=False))
 
@@ -82,11 +82,17 @@ class Series(object):
     def needColor(self):
         raise NotImplementedError()
 
+    def getWidth(self):
+        return 1
+
+    def getStyle(self):
+        return 'solid'
+
     def plot(self, mplSubplot, dateTimes, color):
         values = []
         for dateTime in dateTimes:
             values.append(self.getValue(dateTime))
-        mplSubplot.plot(dateTimes, values, color=color, marker=self.getMarker())
+        mplSubplot.plot(dateTimes, values, color=color, marker=self.getMarker(), linewidth=self.getWidth(), linestyle=self.getStyle(), markeredgewidth=0)
 
 
 class BuyMarker(Series):
@@ -140,6 +146,22 @@ class LineMarker(Series):
     def getMarker(self):
         return self.__marker
 
+class SecondaryMarker(Series):
+    def __init__(self):
+        super(SecondaryMarker, self).__init__()
+        self.__marker = " "
+
+    def needColor(self):
+        return True
+
+    def setMarker(self, marker):
+        self.__marker = marker
+
+    def getMarker(self):
+        return self.__marker
+
+    def getWidth(self):
+        return 0.1
 
 class InstrumentMarker(Series):
     def __init__(self):
@@ -235,6 +257,14 @@ class Subplot(object):
         """
         callback = lambda bars: get_last_value(dataSeries)
         self.__callbacks[callback] = self.getSeries(label, defaultClass)
+        return callback
+
+    def addAndProcessDataSeries(self, label, dataSeries, defaultClass=LineMarker):
+        callback = self.addDataSeries(label, dataSeries, defaultClass)
+        series = self.__callbacks[callback]
+        datetimes = dataSeries.getDateTimes()
+        for i in range(0, len(datetimes)):
+            series.addValue(datetimes[i], dataSeries[i])
 
     def addCallback(self, label, callback, defaultClass=LineMarker):
         """Add a callback that will be called on each bar.
@@ -367,6 +397,9 @@ class StrategyPlotter(object):
         # Notify BarSubplots
         for subplot in self.__barSubplots.values():
             subplot.onOrderEvent(broker_, orderEvent)
+
+    def getSubplots(self):
+        return self.__barSubplots
 
     def getInstrumentSubplot(self, instrument):
         """Returns the InstrumentSubplot for a given instrument
