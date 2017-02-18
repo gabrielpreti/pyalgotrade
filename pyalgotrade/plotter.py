@@ -55,7 +55,8 @@ def _filter_datetimes(dateTimes, fromDate=None, toDate=None):
 
 def _post_plot_fun(subPlot, mplSubplot):
     # Legend
-    mplSubplot.legend(subPlot.getAllSeries().keys(), shadow=True, loc="best", fontsize = 'xx-small')
+    legendsize = len(subPlot.getAllSeries().keys())
+    mplSubplot.legend(subPlot.getAllSeries().keys(), shadow=False, loc="best", fontsize = 'xx-small', framealpha=0, ncol=1 if legendsize<=3 else 2, columnspacing=0)
     # Don't scale the Y axis
     mplSubplot.yaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=False))
 
@@ -88,11 +89,14 @@ class Series(object):
     def getStyle(self):
         return 'solid'
 
+    def getMarkerSize(self):
+        return 5
+
     def plot(self, mplSubplot, dateTimes, color):
         values = []
         for dateTime in dateTimes:
             values.append(self.getValue(dateTime))
-        mplSubplot.plot(dateTimes, values, color=color, marker=self.getMarker(), linewidth=self.getWidth(), linestyle=self.getStyle(), markeredgewidth=0)
+        mplSubplot.plot(dateTimes, values, color=color, marker=self.getMarker(), linewidth=self.getWidth(), linestyle=self.getStyle(), markeredgewidth=0, ms=self.getMarkerSize())
 
 
 class BuyMarker(Series):
@@ -120,7 +124,7 @@ class SellMarker(Series):
 class CustomMarker(Series):
     def __init__(self):
         super(CustomMarker, self).__init__()
-        self.__marker = "o"
+        self.__marker = "."
 
     def needColor(self):
         return True
@@ -135,7 +139,7 @@ class CustomMarker(Series):
 class LineMarker(Series):
     def __init__(self):
         super(LineMarker, self).__init__()
-        self.__marker = " "
+        self.__marker = "."
 
     def needColor(self):
         return True
@@ -149,7 +153,7 @@ class LineMarker(Series):
 class SecondaryMarker(Series):
     def __init__(self):
         super(SecondaryMarker, self).__init__()
-        self.__marker = " "
+        self.__marker = "."
 
     def needColor(self):
         return True
@@ -163,11 +167,14 @@ class SecondaryMarker(Series):
     def getWidth(self):
         return 0.1
 
+    def getMarkerSize(self):
+        return 2
+
 class InstrumentMarker(Series):
     def __init__(self):
         super(InstrumentMarker, self).__init__()
         self.__useAdjClose = None
-        self.__marker = " "
+        self.__marker = "."
 
     def needColor(self):
         return True
