@@ -85,11 +85,11 @@ class RowParser(csvfeed.RowParser):
             return None
             
         dateTime = self.__parseDate(csvRowDict["Date"])
-        close = float(csvRowDict["Close"])
-        open_ = float(csvRowDict["Open"])
-        high = float(csvRowDict["High"])
-        low = float(csvRowDict["Low"])
-        volume = float(csvRowDict["Volume"])
+        close = float(csvRowDict["Close"]) if csvRowDict["Close"] != "-" else None
+        open_ = float(csvRowDict["Open"]) if csvRowDict["Open"] != "-" else None
+        high = float(csvRowDict["High"]) if csvRowDict["High"] != "-" else None
+        low = float(csvRowDict["Low"]) if csvRowDict["Low"] != "-" else None
+        volume = float(csvRowDict["Volume"]) if csvRowDict["Volume"] != "-" else None
         adjClose = None
 
         if self.__sanitize:

@@ -20,9 +20,9 @@
 
 import abc
 
-from pyalgotrade import observer
 from pyalgotrade import dispatchprio
 from pyalgotrade import logger
+from pyalgotrade import observer
 
 
 # This class is used to prevent bugs like the one triggered in testcases.bitstamp_test:TestCase.testRoundingBug.
