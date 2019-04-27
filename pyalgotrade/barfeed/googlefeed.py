@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # PyAlgoTrade
 #
-# Copyright 2011-2015 Gabriel Martin Becedillas Ruiz
+# Copyright 2011-2018 Gabriel Martin Becedillas Ruiz
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ class RowParser(csvfeed.RowParser):
     def parseBar(self, csvRowDict):
         if(self.__rowFilter!=None and self.__rowFilter(csvRowDict)):
             return None
-            
+
         dateTime = self.__parseDate(csvRowDict["Date"])
         close = float(csvRowDict["Close"]) if csvRowDict["Close"] != "-" else None
         open_ = float(csvRowDict["Open"]) if csvRowDict["Open"] != "-" else None
@@ -133,7 +133,7 @@ class Feed(csvfeed.BarFeed):
     def barsHaveAdjClose(self):
         return False
 
-    def addBarsFromCSV(self, instrument, path, timezone=None, rowFilter=None):
+    def addBarsFromCSV(self, instrument, path, timezone=None, skipMalformedBars=False, rowFilter=None):
         """Loads bars for a given instrument from a CSV formatted file.
         The instrument gets registered in the bar feed.
 
@@ -145,10 +145,12 @@ class Feed(csvfeed.BarFeed):
         :type timezone: A pytz timezone.
         :param rowFilter: A function to filter rows from the feed
         :type: a function
+        :param skipMalformedBars: True to skip errors while parsing bars.
+        :type skipMalformedBars: boolean.
         """
 
         if timezone is None:
             timezone = self.__timezone
 
         rowParser = RowParser(self.getDailyBarTime(), self.getFrequency(), timezone, self.__sanitizeBars, rowFilter)
-        super(Feed, self).addBarsFromCSV(instrument, path, rowParser)
+        super(Feed, self).addBarsFromCSV(instrument, path, rowParser, skipMalformedBars=skipMalformedBars)

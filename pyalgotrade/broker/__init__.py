@@ -19,7 +19,9 @@
 """
 
 import abc
+import six
 
+from pyalgotrade import observer
 from pyalgotrade import dispatchprio
 from pyalgotrade import logger
 from pyalgotrade import observer
@@ -29,9 +31,8 @@ from pyalgotrade import observer
 # Why not use decimal.Decimal instead ?
 # 1: I'd have to expose this to users. They'd have to deal with decimal.Decimal and it'll break existing users.
 # 2: numpy arrays built using decimal.Decimal instances have dtype=object.
+@six.add_metaclass(abc.ABCMeta)
 class InstrumentTraits(object):
-
-    __metaclass__ = abc.ABCMeta
 
     # Return the floating point value number rounded.
     @abc.abstractmethod
@@ -539,6 +540,7 @@ class OrderEvent(object):
 
 ######################################################################
 # Base broker class
+@six.add_metaclass(abc.ABCMeta)
 class Broker(observer.Subject):
     """Base class for brokers.
 
@@ -546,8 +548,6 @@ class Broker(observer.Subject):
 
         This is a base class and should not be used directly.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self):
         super(Broker, self).__init__()
@@ -719,6 +719,7 @@ class BaseBrokerImpl(Broker):
         self._nextOrderId = 1
         self._barFeed = barFeed
         self.__useAdjustedValues = False
+	self.__started = False
 
         self.__logger = logger.getLogger(BaseBrokerImpl.LOGGER_NAME)
 
@@ -810,6 +811,19 @@ class BaseBrokerImpl(Broker):
 
     def getShares(self, instrument):
         return self._shares.get(instrument, 0)
+	
+    def setShares(self, instrument, quantity, price):
+        """
+        Set existing shares before the strategy starts executing.
+
+        :param instrument: Instrument identifier.
+        :param quantity: The number of shares for the given instrument.
+        :param price: The price for each share.
+        """
+
+        assert not self.__started, "Can't setShares once the strategy started executing"
+        self.__shares[instrument] = quantity
+        self.__instrumentPrice[instrument] = price
 
     def getAllShares(self):
         return self._shares
@@ -910,6 +924,19 @@ class BaseBrokerImpl(Broker):
     def createMarketOrder(self, action, instrument, quantity, onClose=False):
         raise NotImplementedError()
 
+    def _getPriceForInstrument(self, instrument):
+        ret = None
+
+        # Try gettting the price from the last bar first.
+        lastBar = self.__barFeed.getLastBar(instrument)
+        if lastBar is not None:
+            ret = lastBar.getPrice()
+        else:
+            # Try using the instrument price set by setShares if its available.
+            ret = self.__instrumentPrice.get(instrument)
+
+        return ret
+
     def createStopOrder(self, action, instrument, stopPrice, quantity):
         raise NotImplementedError()
 
@@ -921,6 +948,7 @@ class BaseBrokerImpl(Broker):
 
     def start(self):
         super(BaseBrokerImpl, self).start()
+	self.__started = True
 
     def stop(self):
         pass

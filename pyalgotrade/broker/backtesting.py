@@ -20,6 +20,8 @@
 
 import abc
 
+import six
+
 from pyalgotrade import broker
 from pyalgotrade.broker import fillstrategy
 from pyalgotrade import logger
@@ -29,14 +31,13 @@ import pyalgotrade.bar
 ######################################################################
 # Commission models
 
+@six.add_metaclass(abc.ABCMeta)
 class Commission(object):
     """Base class for implementing different commission schemes.
 
     .. note::
         This is a base class and should not be used directly.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
     def calculate(self, order, price, quantity):
@@ -188,12 +189,13 @@ class Broker(broker.BaseBrokerImpl):
             self.__commission = NoCommission()
         else:
             self.__commission = commission
-
+        self.__instrumentPrice = {}  # Used by setShares
         self.__fillStrategy = fillstrategy.DefaultStrategy()
         self.__logger = logger.getLogger(Broker.LOGGER_NAME)
 
         # It is VERY important that the broker subscribes to barfeed events before the strategy.
         barFeed.getNewValuesEvent().subscribe(self.onBars)
+
 
     def getCommission(self):
         """Returns the strategy used to calculate order commissions.
